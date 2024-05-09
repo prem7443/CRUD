@@ -1,10 +1,13 @@
-FROM python:3.9-alpine
-ENV PYTHONUNBUFFERED 1
-#RUN mkdir /code
-WORKDIR /code
-COPY requirements.txt /code/
-RUN pip install -r requirements.txt
+FROM python:3
+
+WORKDIR /data
+
+RUN pip install django==3.2
+
 COPY . .
 
-ENTRYPOINT ["python", "manage.py"]
-CMD ["runserver", "0.0.0.0:80"]
+RUN python manage.py migrate
+
+EXPOSE 8000
+
+CMD ["python","manage.py","runserver","0.0.0.0:8000"]
