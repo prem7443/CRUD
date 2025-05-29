@@ -1,10 +1,14 @@
-
 name: Auto Close PR on Conflict
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, ready_for_review]
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Pull request number (for manual runs)'
+        required: false
+
 
 jobs:
   check-conflict:
