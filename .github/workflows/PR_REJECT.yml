@@ -18,13 +18,19 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const prNumber = context.payload.pull_request?.number;
+
+            if (!prNumber) {
+              throw new Error("❌ No pull request context found. This workflow only works on PR events.");
+            }
+
             let pr;
 
             for (let i = 0; i < 5; i++) {
               pr = await github.rest.pulls.get({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                pull_number: context.payload.pull_request.number
+                pull_number: prNumber
               });
 
               console.log(`🔁 Attempt ${i + 1}`);
