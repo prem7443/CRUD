@@ -1,3 +1,4 @@
+
 name: Auto Close PR on Conflict
 
 on:
@@ -7,9 +8,9 @@ on:
 jobs:
   check-conflict:
     if: |
-      github.event.pull_request.base.ref == 'master' ||
-      github.event.pull_request.base.ref == 't1' ||
-      github.event.pull_request.base.ref == 't2'
+      github.event.pull_request.base.ref == 'main' ||
+      github.event.pull_request.base.ref == 't3' ||
+      github.event.pull_request.base.ref == 't4'
     runs-on: ubuntu-latest
     steps:
       - name: Check for merge conflicts
