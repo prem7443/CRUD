@@ -23,7 +23,15 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const prNumber = context.payload.pull_request.number;
+            const prData = context.payload.pull_request;
+              
+              if (!prData) {
+                console.log("❌ No pull request found in context. This workflow only works on pull_request events.");
+                return;
+              }
+
+const prNumber = prData.number;
+
 
             let pr;
             for (let i = 0; i < 20; i++) {
