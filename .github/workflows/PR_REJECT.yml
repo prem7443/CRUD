@@ -1,28 +1,73 @@
-# .github/workflows/reject-conflicting-pr.yml
-name: Reject PRs with Merge Conflicts
+name: Auto-Close PR on Merge Conflict
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened] # Triggers when PR is opened, new commits are pushed, or PR is reopened
 
 jobs:
-  reject-conflict-pr:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout PR
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ github.head_ref }}
+  close_conflicting_pr:
+    runs-on: ubuntu-latest # Runs on a fresh Ubuntu environment
+    permissions:
+      pull-requests: write # Essential permission to close PRs and add comments
 
-      - name: Check merge conflict
+    steps:
+      - name: Check for merge conflicts
+        id: check_conflicts # Assign an ID to this step to reference its outputs later
         run: |
-          git fetch origin ${{ github.event.pull_request.base.ref }}
-          if ! git merge-base --is-ancestor origin/${{ github.event.pull_request.base.ref }} HEAD; then
-            echo "PR has conflicts"
-            gh pr close "${{ github.event.pull_request.number }}" \
-              --comment "This pull request has merge conflicts with `${{ github.event.pull_request.base.ref }}`. Please rebase and resolve conflicts before creating a new PR."
+          # Use GitHub API to get detailed PR information
+          # We need to check 'mergeable' and 'mergeable_state'
+          PR_DETAILS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                       "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}")
+
+          MERGEABLE_STATE=$(echo "$PR_DETAILS" | jq -r '.mergeable_state')
+          MERGEABLE=$(echo "$PR_DETAILS" | jq -r '.mergeable')
+
+          echo "PR #${{ github.event.pull_request.number }} mergeable_state: $MERGEABLE_STATE"
+          echo "PR #${{ github.event.pull_request.number }} mergeable: $MERGEABLE"
+
+          # GitHub might report 'unknown' for mergeable_state initially.
+          # Loop to wait for the state to be determined (up to 5 attempts).
+          ATTEMPTS=0
+          MAX_ATTEMPTS=5
+          while [[ "$MERGEABLE_STATE" == "unknown" && $ATTEMPTS -lt $MAX_ATTEMPTS ]]; do
+            echo "Mergeable state is 'unknown'. Waiting 5 seconds and retrying (attempt $((ATTEMPTS + 1))/$MAX_ATTEMPTS)..."
+            sleep 5
+            PR_DETAILS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                         "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}")
+            MERGEABLE_STATE=$(echo "$PR_DETAILS" | jq -r '.mergeable_state')
+            MERGEABLE=$(echo "$PR_DETAILS" | jq -r '.mergeable')
+            ATTEMPTS=$((ATTEMPTS + 1))
+          done
+
+          # Set an output variable 'has_conflicts' based on the mergeable state
+          # 'dirty' state with 'false' mergeable indicates conflicts
+          if [[ "$MERGEABLE" == "false" && "$MERGEABLE_STATE" == "dirty" ]]; then
+            echo "::set-output name=has_conflicts::true"
+            echo "PR has merge conflicts."
           else
-            echo "No conflicts"
+            echo "::set-output name=has_conflicts::false"
+            echo "PR does not have merge conflicts or state is not 'dirty'."
+          fi
+
+      - name: Close PR if conflicts found
+        # This step only runs if the 'has_conflicts' output from the previous step is 'true'
+        if: steps.check_conflicts.outputs.has_conflicts == 'true'
         env:
-          GH_TOKEN: ${{ secrets.PR_REJECTION_TOKEN }}
- 
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # The default token provided by GitHub Actions
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          REPO=${{ github.repository }}
+
+          echo "Closing pull request #$PR_NUMBER due to merge conflicts."
+          # Use GitHub API to update the PR state to 'closed'
+          curl -X PATCH -H "Authorization: token $GITHUB_TOKEN" \
+               -H "Accept: application/vnd.github.v3+json" \
+               "https://api.github.com/repos/$REPO/pulls/$PR_NUMBER" \
+               -d '{"state": "closed"}'
+
+          echo "Adding a comment to the closed PR."
+          # Use GitHub API to add a comment to the issue (PR is also an issue)
+          curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
+               -H "Accept: application/vnd.github.v3+json" \
+               "https://api.github.com/repos/$REPO/issues/$PR_NUMBER/comments" \
+               -d '{"body": "This pull request has merge conflicts that need to be resolved. It has been automatically closed. Please rebase your branch on the latest `main` (or base) branch and open a new pull request."}'
