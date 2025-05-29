@@ -1,8 +1,7 @@
 name: Auto Close PR on Conflict
 
 on:
-  workflow_dispatch:          # 👈 manual run
-  pull_request:               # 👈 auto run on PR open or update
+  pull_request:
     types: [opened, synchronize]
 
 jobs:
@@ -10,53 +9,53 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Check for merge conflicts with debug output
-      uses: actions/github-script@v7
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          let pr;
+      - name: Wait for GitHub to calculate mergeability
+        run: sleep 20
 
-          const pr_number = context.payload.pull_request?.number || 16; // replace 16 for testing if no PR context
+      - name: Check for merge conflicts with debug output
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            let pr;
 
-          for (let i = 0; i < 5; i++) {
-            pr = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: pr_number
-            });
+            for (let i = 0; i < 5; i++) {
+              pr = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number
+              });
 
-            console.log(`🔁 Attempt ${i + 1}`);
-            console.log(`📦 PR #${pr.data.number}`);
-            console.log(`📄 Title: ${pr.data.title}`);
-            console.log(`🔧 Mergeable: ${pr.data.mergeable}`);
+              console.log(`🔁 Attempt ${i + 1}`);
+              console.log(`📦 PR #${pr.data.number}`);
+              console.log(`📄 Title: ${pr.data.title}`);
+              console.log(`🔧 Mergeable: ${pr.data.mergeable}`);
 
-            if (pr.data.mergeable !== null) break;
+              if (pr.data.mergeable !== null) break;
 
-            await new Promise(resolve => setTimeout(resolve, 5000));
-          }
+              await new Promise(resolve => setTimeout(resolve, 5000)); // wait 5 sec
+            }
 
-          if (pr.data.mergeable === false) {
-            console.log("❌ Conflict detected. Closing PR...");
+            if (pr.data.mergeable === false) {
+              console.log("❌ Conflict detected. Closing PR...");
 
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: pr.data.number,
-              body: "❌ This PR has merge conflicts and has been closed automatically by GitHub Actions."
-            });
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.data.number,
+                body: "❌ This PR has merge conflicts and has been closed automatically by GitHub Actions."
+              });
 
-            await github.rest.pulls.update({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: pr.data.number,
-              state: "closed"
-            });
+              await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.data.number,
+                state: "closed"
+              });
 
-            console.log("🛑 PR closed.");
-          } else if (pr.data.mergeable === true) {
-            console.log("✅ PR is clean. No conflicts.");
-          } else {
-            console.log("⚠️ Mergeable status is still null after 5 retries.");
-          }
-
+              console.log("🛑 PR closed.");
+            } else if (pr.data.mergeable === true) {
+              console.log("✅ PR is clean. No conflicts.");
+            } else {
+              console.log("⚠️ Mergeable status is still null after 5 retries.");
+            }
