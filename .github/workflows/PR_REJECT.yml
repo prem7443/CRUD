@@ -1,4 +1,3 @@
-
 name: Auto Close PR on Conflict
 
 on:
@@ -7,10 +6,6 @@ on:
 
 jobs:
   check-conflict:
-    if: |
-      github.event.pull_request.base.ref == 'main' ||
-      github.event.pull_request.base.ref == 't3' ||
-      github.event.pull_request.base.ref == 't4'
     runs-on: ubuntu-latest
     steps:
       - name: Check for merge conflicts
@@ -21,7 +16,7 @@ jobs:
             const prNumber = context.payload.pull_request.number;
 
             let pr;
-            for (let i = 0; i < 5; i++) {
+            for (let i = 0; i < 10; i++) {
               pr = await github.rest.pulls.get({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -29,11 +24,11 @@ jobs:
               });
 
               if (pr.data.mergeable !== null) break;
-              console.log(`Mergeable status is ${pr.data.mergeable}, retrying in 2s...`);
-              await new Promise(resolve => setTimeout(resolve, 2000));
+              console.log(`Mergeable status is ${pr.data.mergeable}, retrying in 3s...`);
+              await new Promise(resolve => setTimeout(resolve, 3000));
             }
 
-            if (pr.data.mergeable === false) {
+            if (pr.data.mergeable === false || pr.data.mergeable_state === "dirty") {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
