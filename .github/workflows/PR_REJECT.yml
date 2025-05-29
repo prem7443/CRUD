@@ -3,7 +3,7 @@ name: Auto-Close PR on Merge Conflict
 on:
   pull_request:
     types: [opened, synchronize, reopened] # Triggers when PR is opened, new commits are pushed, or PR is reopened
-
+  workflow_dispatch:
 jobs:
   close_conflicting_pr:
     runs-on: ubuntu-latest # Runs on a fresh Ubuntu environment
