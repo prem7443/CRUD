@@ -3,7 +3,9 @@ name: Auto-Close PR on Merge Conflict
 on:
   pull_request:
     types: [opened, synchronize, reopened] # Triggers when PR is opened, new commits are pushed, or PR is reopened
+  # Add workflow_dispatch to allow manual triggering for testing
   workflow_dispatch:
+
 jobs:
   close_conflicting_pr:
     runs-on: ubuntu-latest # Runs on a fresh Ubuntu environment
@@ -39,13 +41,13 @@ jobs:
             ATTEMPTS=$((ATTEMPTS + 1))
           done
 
-          # Set an output variable 'has_conflicts' based on the mergeable state
+          # Set an output variable 'has_conflicts' using an environment file
           # 'dirty' state with 'false' mergeable indicates conflicts
           if [[ "$MERGEABLE" == "false" && "$MERGEABLE_STATE" == "dirty" ]]; then
-            echo "::set-output name=has_conflicts::true"
+            echo "has_conflicts=true" >> "$GITHUB_OUTPUT"
             echo "PR has merge conflicts."
           else
-            echo "::set-output name=has_conflicts::false"
+            echo "has_conflicts=false" >> "$GITHUB_OUTPUT"
             echo "PR does not have merge conflicts or state is not 'dirty'."
           fi
 
