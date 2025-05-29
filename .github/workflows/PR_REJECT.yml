@@ -2,12 +2,22 @@ name: Auto Close PR on Conflict
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, reopened, labeled, ready_for_review]
+  workflow_dispatch:
 
 jobs:
   check-conflict:
     runs-on: ubuntu-latest
     steps:
+      - name: Log event trigger
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          echo "Triggered by event: $EVENT_NAME"
+
+      - name: Wait for GitHub to calculate mergeability
+        run: sleep 20
+
       - name: Check for merge conflicts
         uses: actions/github-script@v7
         with:
@@ -16,34 +26,39 @@ jobs:
             const prNumber = context.payload.pull_request.number;
 
             let pr;
-            for (let i = 0; i < 10; i++) {
+            for (let i = 0; i < 20; i++) {
               pr = await github.rest.pulls.get({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: prNumber,
               });
 
+              console.log(`Attempt ${i + 1}: mergeable = ${pr.data.mergeable}, state = ${pr.data.mergeable_state}`);
+
               if (pr.data.mergeable !== null) break;
-              console.log(`Mergeable status is ${pr.data.mergeable}, retrying in 3s...`);
               await new Promise(resolve => setTimeout(resolve, 3000));
             }
 
             if (pr.data.mergeable === false || pr.data.mergeable_state === "dirty") {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                body: "❌ This PR has merge conflicts and will be closed automatically."
-              });
+              try {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  body: "❌ This PR has merge conflicts and will be closed automatically. Please resolve the conflicts and open a new PR."
+                });
 
-              await github.rest.pulls.update({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: prNumber,
-                state: "closed"
-              });
+                await github.rest.pulls.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: prNumber,
+                  state: "closed"
+                });
 
-              console.log("❌ PR closed due to merge conflict.");
+                console.log("❌ PR closed due to merge conflict.");
+              } catch (error) {
+                console.log("⚠️ Failed to comment or close PR:", error.message);
+              }
             } else {
               console.log("✅ No conflict, PR is mergeable.");
             }
