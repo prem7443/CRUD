@@ -30,7 +30,7 @@ jobs:
                 return;
               }
 
-const prNumber = prData.number;
+              const prNumber = prData.number;
 
 
             let pr;
