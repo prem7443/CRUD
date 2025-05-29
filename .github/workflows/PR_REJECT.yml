@@ -2,7 +2,7 @@ name: Auto Close PR on Conflict
  
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, reopened]
  
 jobs:
   check-conflict:
