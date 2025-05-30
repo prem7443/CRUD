@@ -1,7 +1,8 @@
 name: Auto-Close Conflicted PRs
 
 on:
-  workflow_dispatch:  # Manual trigger for testing
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 permissions:
   pull-requests: write
@@ -11,17 +12,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Wait 10s for GitHub to determine mergeability
+      - name: Wait 10 seconds for GitHub to determine mergeability
         run: sleep 10
 
-      - name: Get PR #22 details
+      - name: Get PR details dynamically
         id: pr
         uses: octokit/request-action@v2.x
         with:
-          route: GET /repos/${{ github.repository }}/pulls/22
+          route: GET /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -30,10 +28,10 @@ jobs:
         run: |
           echo "mergeable=$(echo '${{ steps.pr.outputs.data }}' | jq '.mergeable')" >> $GITHUB_OUTPUT
 
-      - name: Close PR #22 if mergeable is false
+      - name: Close PR if mergeable is false (has conflicts)
         if: steps.merge_check.outputs.mergeable == 'false'
         uses: peter-evans/close-pull@v3
         with:
-          pull-number: 22
           comment: |
             ❌ This PR has merge conflicts and was automatically closed.
+          pull-request-number: ${{ github.event.pull_request.number }}
