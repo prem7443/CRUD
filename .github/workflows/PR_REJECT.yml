@@ -1,8 +1,8 @@
 name: Auto-Close Conflicted PRs
 
 on:
-  workflow_dispatch:  # Manual trigger for testing
-    
+  pull_request:
+    types: [opened, synchronize, reopened] # Trigger on PR open, updates, and reopen
 
 permissions:
   pull-requests: write
@@ -11,13 +11,12 @@ jobs:
   close_conflicted_pr:
     runs-on: ubuntu-latest
 
-    steps:							 
-
+    steps:
       - name: Wait 10 seconds for GitHub to determine mergeability
-        run: sleep 10
+        run: sleep 10 # This is a heuristic, mergeability can take longer
 
-      - name: Get PR details dynamically
-        id: pr
+      - name: Get PR details
+        id: pr_details
         uses: octokit/request-action@v2.x
         with:
           route: GET /repos/${{ github.repository }}/pulls/${{ github.event.pull.number }}
@@ -27,12 +26,16 @@ jobs:
       - name: Extract mergeable field
         id: merge_check
         run: |
-          echo "mergeable=$(echo '${{ steps.pr.outputs.data }}' | jq '.mergeable')" >> $GITHUB_OUTPUT
+          # The output from octokit/request-action is already a JSON string.
+          # Use jq -r to get the raw boolean value (true or false).
+          MERGEABLE_STATUS=$(echo "${{ steps.pr_details.outputs.data }}" | jq -r '.mergeable')
+          echo "mergeable=$MERGEABLE_STATUS" >> "$GITHUB_OUTPUT"
 
       - name: Close PR if mergeable is false (has conflicts)
+        # Compare with the boolean value 'false'
         if: steps.merge_check.outputs.mergeable == 'false'
         uses: peter-evans/close-pull@v3
-        with:					 
+        with:
           comment: |
             ❌ This PR has merge conflicts and was automatically closed.
           pull-number: ${{ github.event.pull.number }}
