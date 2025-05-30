@@ -3,10 +3,6 @@ name: Auto-Close Conflicted PRs
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  push:
-    # Trigger on push to the default branch (dynamic detection)
-    branches:
-      - ${{ github.event.repository.default_branch }}
 
 permissions:
   pull-requests: write
@@ -14,99 +10,33 @@ permissions:
 jobs:
   close_conflicted_pr:
     runs-on: ubuntu-latest
-    # Only run this job if the PR is not a draft and not already closed
-    if: github.event_name == 'pull_request' && github.event.pull_request.state == 'open' && github.event.pull_request.draft == false
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Get current PR details
-        id: get_pr_context
-        run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
-            echo "PR_MERGEABLE=${{ github.event.pull_request.mergeable }}" >> $GITHUB_ENV
-            echo "IS_PULL_REQUEST_EVENT=true" >> $GITHUB_ENV
-            echo "DEFAULT_BRANCH=${{ github.event.repository.default_branch }}" >> $GITHUB_ENV
-          elif [[ "${{ github.event_name }}" == "push" ]]; then
-            echo "IS_PULL_REQUEST_EVENT=false" >> $GITHUB_ENV
-            echo "DEFAULT_BRANCH=${{ github.event.repository.default_branch }}" >> $GITHUB_ENV
-          fi
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
       - name: Wait for GitHub to determine mergeability
-        run: sleep 15
-
-      - name: Check and close conflicting PRs (Pull Request event)
-        if: env.IS_PULL_REQUEST_EVENT == 'true' && github.event.pull_request.state == 'open' && github.event.pull_request.draft == false
-        id: check_pr_event_mergeability
-        uses: octokit/request-action@v2.x
-        with:
-          route: GET /repos/${{ github.repository }}/pulls/${{ env.PR_NUMBER }}
+        id: wait_mergeable
+        run: |
+          for i in {1..10}; do
+            pr_data=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }})
+            mergeable=$(echo "$pr_data" | jq -r '.mergeable')
+            echo "Attempt $i: mergeable=$mergeable"
+            if [[ "$mergeable" != "null" ]]; then
+              echo "mergeable=$mergeable" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "mergeable=null" >> $GITHUB_OUTPUT
+          exit 1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract mergeable field (Pull Request event)
-        if: env.IS_PULL_REQUEST_EVENT == 'true'
-        id: merge_check_pr_event
-        run: |
-          echo "mergeable=$(echo '${{ steps.check_pr_event_mergeability.outputs.data }}' | jq -r '.mergeable')" >> $GITHUB_OUTPUT
-          echo "current_pr_number=${{ env.PR_NUMBER }}" >> $GITHUB_OUTPUT
-
-      - name: Close current PR if mergeable is false (Pull Request event)
-        if: |
-          env.IS_PULL_REQUEST_EVENT == 'true' &&
-          steps.merge_check_pr_event.outputs.mergeable == 'false' &&
-          github.event.pull_request.state == 'open'
+      - name: Close PR if mergeable is false
+        if: steps.wait_mergeable.outputs.mergeable == 'false'
         uses: peter-evans/close-pull@v3
         with:
-          pull-number: ${{ steps.merge_check_pr_event.outputs.current_pr_number }}
+          pull-number: ${{ github.event.pull_request.number }}
           comment: |
-            ❌ This PR has merge conflicts with the base branch (`${{ github.event.pull_request.base.ref }}`) and was automatically closed.
-            Please rebase your branch on the latest version of the base branch and re-open a new PR.
-
-      - name: Find and close conflicting PRs (Push event to base branch)
-        if: |
-          github.event_name == 'push' &&
-          github.ref == format('refs/heads/{0}', env.DEFAULT_BRANCH) # Use the dynamically determined default branch
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const { owner, repo } = context.repo;
-            const defaultBranch = process.env.DEFAULT_BRANCH; // Get from env variable
-
-            const { data: pullRequests } = await github.rest.pulls.list({
-              owner,
-              repo,
-              state: 'open',
-              base: defaultBranch // Use the dynamically determined default branch
-            });
-
-            for (const pr of pullRequests) {
-              const { data: prDetails } = await github.rest.pulls.get({
-                owner,
-                repo,
-                pull_number: pr.number,
-              });
-
-              console.log(`Checking PR #${prDetails.number}: mergeable=${prDetails.mergeable}, state=${prDetails.state}, draft=${prDetails.draft}`);
-
-              if (prDetails.state === 'open' && prDetails.draft === false && prDetails.mergeable === false) {
-                console.log(`Closing conflicted PR #${prDetails.number}`);
-                await github.rest.issues.createComment({
-                  owner,
-                  repo,
-                  issue_number: prDetails.number,
-                  body: `❌ This PR has merge conflicts with the base branch (\`${defaultBranch}\`) and was automatically closed.
-                  Please rebase your branch on the latest version of the base branch and re-open a new PR.`,
-                });
-                await github.rest.pulls.update({
-                  owner,
-                  repo,
-                  pull_number: prDetails.number,
-                  state: 'closed',
-                });
-              }
-            }
-        env:
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }} # Pass to script environment
+            ❌ This PR has merge conflicts and was automatically closed.
