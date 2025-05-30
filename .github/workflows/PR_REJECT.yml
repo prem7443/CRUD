@@ -1,8 +1,8 @@
 name: Auto-Close Conflicted PRs
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  workflow_dispatch:  # Manual trigger for testing
+    
 
 permissions:
   pull-requests: write
