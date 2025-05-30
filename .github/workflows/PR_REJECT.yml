@@ -4,27 +4,24 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions:
+  pull-requests: write
+
 jobs:
   close_conflicted_pr:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out the repo
-        uses: actions/checkout@v4
+      - name: Get PR info using GitHub API
+        id: get_pr
+        uses: octokit/request-action@v2.x
+        with:
+          route: GET /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check for merge conflicts
-        id: check_conflict
-        run: |
-          git fetch origin ${{ github.base_ref }}
-          CONFLICT=$(git merge --no-commit --no-ff origin/${{ github.base_ref }} || echo "conflict")
-          if [[ "$CONFLICT" == "conflict" ]]; then
-            echo "has_conflict=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_conflict=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Close pull request if conflicted
-        if: steps.check_conflict.outputs.has_conflict == 'true'
+      - name: Check if PR is unmergeable
+        if: contains(steps.get_pr.outputs.data, '"mergeable":false')
         uses: peter-evans/close-pull@v3
         with:
-          comment: "❌ This pull request has merge conflicts and will be closed automatically."
+          comment: "❌ This pull request has merge conflicts and was automatically closed."
