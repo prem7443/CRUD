@@ -27,12 +27,12 @@ jobs:
             mergeable=$(echo "$pr_data" | jq -r '.mergeable')
             echo "mergeable=$mergeable"
             if [[ "$mergeable" != "null" ]]; then
-              echo "mergeable=$mergeable" >> "$GITHUB_OUTPUT"
+              echo "mergeable=$mergeable" >> $GITHUB_OUTPUT
               exit 0
             fi
             sleep 3
           done
-          echo "mergeable=null" >> "$GITHUB_OUTPUT"
+          echo "mergeable=null" >> $GITHUB_OUTPUT
           exit 1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
