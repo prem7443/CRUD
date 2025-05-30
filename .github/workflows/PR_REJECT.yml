@@ -3,6 +3,7 @@ name: Auto-Close Conflicted PRs
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  workflow_dispatch:  # ✅ Manual trigger
 
 permissions:
   pull-requests: write
@@ -12,14 +13,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Wait 10s for GitHub to determine mergeability
+      - name: Wait 10s for GitHub to calculate mergeability
         run: sleep 10
 
       - name: Get PR details
         id: pr
         uses: octokit/request-action@v2.x
         with:
-          route: GET /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}
+          route: GET /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number || '1' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -32,4 +33,3 @@ jobs:
         with:
           comment: |
             ❌ This pull request has merge conflicts and was automatically closed.
-            Please resolve the conflicts and open a new PR.
