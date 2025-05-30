@@ -1,3 +1,4 @@
+
 name: Auto-Close Conflicted PRs
 
 on:
@@ -21,7 +22,7 @@ jobs:
         id: pr
         uses: octokit/request-action@v2.x
         with:
-          route: GET /repos/${{ github.repository }}/pulls/22
+          route: GET /repos/${{ github.repository }}/pulls/num
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -33,6 +34,6 @@ jobs:
         if: steps.merge_check.outputs.mergeable == 'false'
         uses: peter-evans/close-pull@v3
         with:
-          pull-number: 22
+          pull-number: num
           comment: |
             ❌ This PR has merge conflicts and was automatically closed.
