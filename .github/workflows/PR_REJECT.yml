@@ -1,12 +1,8 @@
 name: Auto-Close Conflicted PRs
 
 on:
-  workflow_dispatch:
-    inputs:
-      pr_number:
-        description: 'Pull request number to check'
-        required: true
-        type: string
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 permissions:
   pull-requests: write
@@ -39,12 +35,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
 
       - name: Close PR if mergeable is false (has conflicts)
         if: steps.wait_mergeable.outputs.mergeable == 'false'
         uses: peter-evans/close-pull@v3
         with:
-          pull-number: ${{ inputs.pr_number }}
+          pull-number: ${{ github.event.pull_request.number }}
           comment: |
             ❌ This PR has merge conflicts and was automatically closed.
