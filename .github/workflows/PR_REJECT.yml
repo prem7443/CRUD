@@ -13,23 +13,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Wait 10s for GitHub to calculate mergeability
+      - name: Wait 10s for GitHub to determine mergeability
         run: sleep 10
 
       - name: Get PR details
         id: pr
         uses: octokit/request-action@v2.x
         with:
-          route: GET /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number || '1' }}
+          route: GET /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Debug response
-        run: echo '${{ steps.pr.outputs.data }}'
+      - name: Extract mergeable field
+        id: merge_check
+        run: |
+          echo "mergeable=$(echo '${{ steps.pr.outputs.data }}' | jq '.mergeable')" >> $GITHUB_OUTPUT
 
-      - name: Close PR if it has merge conflicts
-        if: contains(steps.pr.outputs.data, '"mergeable":false')
+      - name: Close PR if mergeable is false
+        if: steps.merge_check.outputs.mergeable == 'false'
         uses: peter-evans/close-pull@v3
         with:
           comment: |
-            ❌ This pull request has merge conflicts and was automatically closed.
+            ❌ This PR has merge conflicts and was automatically closed.
