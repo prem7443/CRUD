@@ -16,11 +16,11 @@ jobs:
       - name: Wait 10s for GitHub to determine mergeability
         run: sleep 10
 
-      - name: Get PR #22 details
+      - name: Get PR #25 details
         id: pr
         uses: octokit/request-action@v2.x
         with:
-          route: GET /repos/${{ github.repository }}/pulls/22
+          route: GET /repos/${{ github.repository }}/pulls/25
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -28,10 +28,10 @@ jobs:
         id: merge_check
         run: |
           echo "mergeable=$(echo '${{ steps.pr.outputs.data }}' | jq '.mergeable')" >> $GITHUB_OUTPUT
-      - name: Close PR #22 if mergeable is false
+      - name: Close PR #25 if mergeable is false
         if: steps.merge_check.outputs.mergeable == 'false'
         uses: peter-evans/close-pull@v3
         with:
-          pull-number: 22
+          pull-number: 25
           comment: |
             ❌ This PR has merge conflicts and was automatically closed.
