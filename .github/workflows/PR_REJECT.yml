@@ -40,7 +40,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
 
       - name: Debug mergeable output
-        run: echo "Final mergeable value: ${{ steps.wait_mergeable.outputs.mergeable }}"
+        run: echo "mergeable=${{ steps.wait_mergeable.outputs.mergeable }}"
 
       - name: Close PR if mergeable is false
         if: steps.wait_mergeable.outputs.mergeable == 'false'
