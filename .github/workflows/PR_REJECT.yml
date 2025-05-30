@@ -1,4 +1,3 @@
-
 name: Auto-Close Conflicted PRs
 
 on:
@@ -12,9 +11,7 @@ jobs:
   close_conflicted_pr:
     runs-on: ubuntu-latest
 
-    steps:
-								 
-								 
+    steps:							 
 
       - name: Wait 10 seconds for GitHub to determine mergeability
         run: sleep 10
@@ -35,10 +32,9 @@ jobs:
       - name: Close PR if mergeable is false (has conflicts)
         if: steps.merge_check.outputs.mergeable == 'false'
         uses: peter-evans/close-pull@v3
-        with:
-						 
+        with:					 
           comment: |
             ❌ This PR has merge conflicts and was automatically closed.
-          pull-number: ${{ github.event.pull_request.number }}
+          pull-request-number: ${{ github.event.pull.number }}
 
 
