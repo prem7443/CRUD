@@ -18,26 +18,31 @@ jobs:
       - name: Wait for GitHub to determine mergeability
         id: wait_mergeable
         run: |
+          echo "Checking PR #${{ github.event.pull_request.number }}"
           for i in {1..10}; do
-            echo "Checking mergeability... Attempt $i"
+            echo "Attempt $i"
             pr_data=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
               https://api.github.com/repos/$REPO/pulls/$PR_NUMBER)
+            echo "$pr_data" | jq '.'
             mergeable=$(echo "$pr_data" | jq -r '.mergeable')
             echo "mergeable=$mergeable"
             if [[ "$mergeable" != "null" ]]; then
-              echo "mergeable=$mergeable" >> $GITHUB_OUTPUT
+              echo "mergeable=$mergeable" >> "$GITHUB_OUTPUT"
               exit 0
             fi
             sleep 3
           done
-          echo "mergeable=null" >> $GITHUB_OUTPUT
+          echo "mergeable=null" >> "$GITHUB_OUTPUT"
           exit 1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
 
-      - name: Close PR if mergeable is false (has conflicts)
+      - name: Debug mergeable output
+        run: echo "Final mergeable value: ${{ steps.wait_mergeable.outputs.mergeable }}"
+
+      - name: Close PR if mergeable is false
         if: steps.wait_mergeable.outputs.mergeable == 'false'
         uses: peter-evans/close-pull@v3
         with:
