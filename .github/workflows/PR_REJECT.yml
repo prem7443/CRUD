@@ -3,16 +3,9 @@ name: Auto-Close Conflicted PRs
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  workflow_dispatch:
-    inputs:
-      pr_number:
-        description: 'Pull request number to check'
-        required: true
-        type: string
 
 permissions:
   pull-requests: write
-  contents: read
 
 jobs:
   close_conflicted_pr:
@@ -20,44 +13,36 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
+        uses: actions/checkout@v3
 
       - name: Wait for GitHub to determine mergeability
         id: wait_mergeable
         run: |
-          PR_NUMBER=${{ github.event.pull_request.number || inputs.pr_number }}
-          for i in {1..15}; do
+          for i in {1..10}; do
             echo "Checking mergeability... Attempt $i"
-            response=$(curl -s -w "%{http_code}" -H "Authorization: Bearer $GITHUB_TOKEN" \
+            pr_data=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
               https://api.github.com/repos/$REPO/pulls/$PR_NUMBER)
-            status_code=$(echo "$response" | tail -n1)
-            pr_data=$(echo "$response" | head -n-1)
-            if [[ $status_code -ne 200 ]]; then
-              echo "Error: API request failed with status $status_code"
-              exit 1
-            fi
             mergeable=$(echo "$pr_data" | jq -r '.mergeable')
             echo "mergeable=$mergeable"
             if [[ "$mergeable" != "null" ]]; then
-              echo "mergeable=$mergeable" >> $GITHUB_OUTPUT
+              echo "mergeable=$mergeable" >> "$GITHUB_STEP_OUTPUT"
               exit 0
             fi
-            sleep 5
+            sleep 3
           done
-          echo "mergeable=null" >> $GITHUB_OUTPUT
+          echo "mergeable=null" >> "$GITHUB_STEP_OUTPUT"
           exit 1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        outputs:
+          mergeable: ${{ steps.wait_mergeable.outputs.mergeable }}
 
       - name: Close PR if mergeable is false (has conflicts)
         if: steps.wait_mergeable.outputs.mergeable == 'false'
-        uses: peter-evans/close-pull@v7
+        uses: peter-evans/close-pull@v3
         with:
-          pull-request-number: ${{ github.event.pull_request.number || inputs.pr_number }}
+          pull-number: ${{ github.event.pull_request.number }}
           comment: |
             ❌ This PR has merge conflicts and was automatically closed.
