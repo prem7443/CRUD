@@ -46,4 +46,3 @@ jobs:
           pull-number: ${{ github.event.pull_request.number }}
           comment: |
             ❌ This PR has merge conflicts and was automatically closed.
-
