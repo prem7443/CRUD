@@ -25,22 +25,20 @@ jobs:
             mergeable=$(echo "$pr_data" | jq -r '.mergeable')
             echo "mergeable=$mergeable"
             if [[ "$mergeable" != "null" ]]; then
-              echo "mergeable=$mergeable" >> "$GITHUB_STEP_OUTPUT"
+              echo "MERGEABLE=$mergeable" >> "$GITHUB_ENV"
               exit 0
             fi
             sleep 3
           done
-          echo "mergeable=null" >> "$GITHUB_STEP_OUTPUT"
+          echo "MERGEABLE=null" >> "$GITHUB_ENV"
           exit 1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        outputs:
-          mergeable: ${{ steps.wait_mergeable.outputs.mergeable }}
 
       - name: Close PR if mergeable is false (has conflicts)
-        if: steps.wait_mergeable.outputs.mergeable == 'false'
+        if: env.MERGEABLE == 'false'
         uses: peter-evans/close-pull@v3
         with:
           pull-number: ${{ github.event.pull_request.number }}
