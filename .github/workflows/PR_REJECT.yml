@@ -3,7 +3,6 @@ name: Auto-Close Conflicted PRs
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    branches: [t2] # Adjust to your default branch
 
 permissions:
   pull-requests: write
@@ -13,6 +12,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Debug Trigger
+        run: echo "Workflow triggered for PR #${{ github.event.pull_request.number }} on event ${{ github.event.action }}"
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
