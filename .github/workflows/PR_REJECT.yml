@@ -12,9 +12,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      #-- Checkout not needed; remove if you like
-      #- name: Checkout repository
-      #  uses: actions/checkout@v3
+      # ── (Optional) uncomment if you really need the repo’s files ───────────────
+      # - name: Checkout repository
+      #   uses: actions/checkout@v3
 
       - name: Wait for GitHub to determine mergeability
         id: wait_mergeable
@@ -30,6 +30,7 @@ jobs:
               -H "Authorization: Bearer $GITHUB_TOKEN" \
               -H "Accept: application/vnd.github+json" \
               https://api.github.com/repos/$REPO/pulls/$PR_NUMBER)
+
             mergeable=$(echo "$pr_data" | jq -r '.mergeable')
             echo "mergeable=$mergeable"
             if [[ "$mergeable" != "null" ]]; then
@@ -38,7 +39,7 @@ jobs:
             fi
             sleep 3
           done
-          # give up — mark unknown so later step skips
+          # Give up—mark unknown so later step skips
           echo "mergeable=unknown" >> "$GITHUB_OUTPUT"
           exit 0
 
