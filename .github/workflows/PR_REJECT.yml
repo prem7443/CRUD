@@ -12,42 +12,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ── (Optional) uncomment if you really need the repo’s files ───────────────
-      # - name: Checkout repository
-      #   uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
       - name: Wait for GitHub to determine mergeability
         id: wait_mergeable
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          echo "Checking PR #$PR_NUMBER"
           for i in {1..10}; do
-            echo "Attempt $i"
-            pr_data=$(curl -s \
-              -H "Authorization: Bearer $GITHUB_TOKEN" \
-              -H "Accept: application/vnd.github+json" \
+            echo "Checking mergeability... Attempt $i"
+            pr_data=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
               https://api.github.com/repos/$REPO/pulls/$PR_NUMBER)
-
             mergeable=$(echo "$pr_data" | jq -r '.mergeable')
             echo "mergeable=$mergeable"
             if [[ "$mergeable" != "null" ]]; then
-              echo "mergeable=$mergeable" >> "$GITHUB_OUTPUT"
+              echo "mergeable=$mergeable" >> $GITHUB_OUTPUT
               exit 0
             fi
             sleep 3
           done
-          # Give up—mark unknown so later step skips
-          echo "mergeable=unknown" >> "$GITHUB_OUTPUT"
-          exit 0
+          echo "mergeable=null" >> $GITHUB_OUTPUT
+          exit 1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
 
-      - name: Debug mergeable output
-        run: echo "mergeable=${{ steps.wait_mergeable.outputs.mergeable }}"
-
-      - name: Close PR if mergeable is false
-        if: ${{ steps.wait_mergeable.outputs.mergeable == 'false' }}
+      - name: Close PR if mergeable is false (has conflicts)
+        if: steps.wait_mergeable.outputs.mergeable == 'false'
         uses: peter-evans/close-pull@v3
         with:
           pull-number: ${{ github.event.pull_request.number }}
