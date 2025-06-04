@@ -9,53 +9,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check PR mergeability with retry
+      - name: Check PR mergeability
         uses: actions/github-script@v7
         with:
           script: |
-            async function wait(ms) {
-              return new Promise(resolve => setTimeout(resolve, ms));
-            }
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number
+            });
 
-            const prNumber = context.payload.pull_request.number;
-            let attempts = 0;
-            let mergeable = null;
+            const isMergeable = pr.data.mergeable;
 
-            // Retry checking mergeability up to 5 times
-            while (mergeable === null && attempts < 5) {
-              const pr = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: prNumber
-              });
-
-              mergeable = pr.data.mergeable;
-              attempts++;
-
-              if (mergeable === null) {
-                console.log(`Mergeability is still unknown (attempt ${attempts}). Waiting 2 seconds...`);
-                await wait(2000);
-              }
-            }
-
-            if (mergeable === false) {
+            // GitHub may return `null` for mergeable if it's still calculating.
+            if (isMergeable === false) {
+              // Leave a comment
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: prNumber,
+                issue_number: context.payload.pull_request.number,
                 body: '⚠️ This pull request has merge conflicts and will be closed automatically. Please resolve the conflicts and create a new PR if needed.'
               });
 
+              // Close the PR
               await github.rest.pulls.update({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                pull_number: prNumber,
+                pull_number: context.payload.pull_request.number,
                 state: 'closed'
               });
-
-              console.log('PR had merge conflicts and was closed.');
-            } else if (mergeable === null) {
-              core.setFailed('Could not determine mergeability after multiple attempts.');
+            } else if (isMergeable === null) {
+              // Try again later by failing this job (so it can be retried manually or re-run by PR update)
+              core.setFailed('Mergeability is unknown at this time. Try again later.');
             } else {
               console.log('PR is mergeable. No action needed.');
             }
