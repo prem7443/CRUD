@@ -39,6 +39,6 @@ jobs:
         run: |
           echo "Closing PR due to merge conflict..."
           gh pr close ${{ github.event.pull_request.number }} --comment "This PR was automatically closed because it has merge conflicts with the base branch."
-          gh pr comment ${{ github.event.pull_request.number }} --body "This PR has merge conflicts with the base branch and has been closed automatically."
+          #gh pr comment ${{ github.event.pull_request.number }} --body "This PR has merge conflicts with the base branch and has been closed automatically."
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
