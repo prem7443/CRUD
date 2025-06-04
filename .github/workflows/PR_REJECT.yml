@@ -15,10 +15,7 @@ jobs:
           ref: ${{ github.head_ref }}
           fetch-depth: 0
 
-      - name: Configure Git 
-        run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
+      
       - name: Fetch base branch
         run: git fetch origin ${{ github.event.pull_request.base.ref }}
 
