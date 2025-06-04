@@ -1,64 +1,40 @@
-name: Auto Close Conflicted PRs
+
+name: Auto-Close PRs with Conflicts
 
 on:
   pull_request_target:
     types: [opened, synchronize, reopened]
 
-permissions:
-  pull-requests: write
-  issues: write
-
 jobs:
-  check-mergeability:
+  check-conflicts:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check PR mergeability
-        uses: actions/github-script@v7
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
         with:
-          script: |
-            const core = require('@actions/core');
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
 
-            async function getPRWithRetry(owner, repo, number, maxRetries = 3, delayMs = 5000) {
-              for (let i = 0; i < maxRetries; i++) {
-                const pr = await github.rest.pulls.get({
-                  owner,
-                  repo,
-                  pull_number: number
-                });
+      
+      - name: Fetch base branch
+        run: git fetch origin ${{ github.event.pull_request.base.ref }}
 
-                const mergeable = pr.data.mergeable;
-                if (mergeable !== null) return mergeable;
-
-                console.log(`Attempt ${i + 1}: Mergeable is null, retrying in ${delayMs / 1000}s...`);
-                await new Promise(resolve => setTimeout(resolve, delayMs));
-              }
-              core.setFailed('Mergeability is still unknown after retries.');
-              return null;
-            }
-
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const number = context.payload.pull_request.number;
-
-            const isMergeable = await getPRWithRetry(owner, repo, number);
-
-            if (isMergeable === false) {
-              console.log('PR has merge conflicts. Closing it.');
-
-              await github.rest.issues.createComment({
-                owner,
-                repo,
-                issue_number: number,
-                body: '⚠️ This pull request has merge conflicts with the base branch and has been closed automatically. Please resolve the conflicts and open a new PR.'
-              });
-
-              await github.rest.pulls.update({
-                owner,
-                repo,
-                pull_number: number,
-                state: 'closed'
-              });
-            } else if (isMergeable === true) {
-              console.log('PR is mergeable. No action needed.');
-            }
+      - name: Check for merge conflicts 
+        id: check_merge
+        run: |
+          git checkout -b temp-merge-check
+          if git merge origin/${{ github.event.pull_request.base.ref }} --no-commit --no-ff; then
+            echo "merge_exit_code=0" >> $GITHUB_OUTPUT
+          else
+            echo "merge_exit_code=1" >> $GITHUB_OUTPUT
+            git merge --abort
+          fi
+      - name: Close and Comment on PR if merge conflict
+        if: steps.check_merge.outputs.merge_exit_code != '0'
+        run: |
+          echo "Closing PR due to merge conflict..."
+          gh pr close ${{ github.event.pull_request.number }} --comment "This PR was automatically closed because it has merge conflicts with the base branch."
+          gh pr comment ${{ github.event.pull_request.number }} --body "This PR has merge conflicts with the base branch and has been closed automatically."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
