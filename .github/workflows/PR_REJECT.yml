@@ -1,3 +1,4 @@
+
 name: Auto-Close PRs with Conflicts
  
 on:
@@ -34,11 +35,9 @@ jobs:
           fi
 
  
-      - name: Close and Comment on PR if merge conflict
+      - name: Assign PR author to resolve conflict
         if: steps.check_merge.outputs.merge_exit_code != '0'
         run: |
-          echo "Closing PR due to merge conflict..."
-          gh pr close ${{ github.event.pull_request.number }} --comment "This PR was automatically closed because it has merge conflicts with the base branch."
-          #gh pr comment ${{ github.event.pull_request.number }} --body "This PR has merge conflicts with the base branch and has been closed automatically."
+          gh pr edit ${{ github.event.pull_request.number }} --add-assignee "${{ github.event.pull_request.user.login }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
