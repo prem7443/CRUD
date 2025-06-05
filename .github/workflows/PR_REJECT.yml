@@ -26,13 +26,13 @@ jobs:
       - name: Check for merge conflicts 
         id: check_merge
         run: |
-          git checkout -b temp-merge-check
           if git merge origin/${{ github.event.pull_request.base.ref }} --no-commit --no-ff; then
             echo "merge_exit_code=0" >> $GITHUB_OUTPUT
           else
             echo "merge_exit_code=1" >> $GITHUB_OUTPUT
             git merge --abort
           fi
+
  
       - name: Close and Comment on PR if merge conflict
         if: steps.check_merge.outputs.merge_exit_code != '0'
